@@ -1,0 +1,13 @@
+▲ Next.js 16.2.6 (Turbopack)
+- Local:         http://127.0.0.1:3000
+- Network:       http://127.0.0.1:3000
+- Environments: .env.local
+✓ Ready in 1311ms
+
+○ Compiling / ...
+ GET / 200 in 6.1s (next.js: 5.4s, application-code: 718ms)
+ GET / 200 in 153ms (next.js: 8ms, application-code: 145ms)
+ GET / 200 in 171ms (next.js: 7ms, application-code: 164ms)
+ GET /login 200 in 2.0s (next.js: 1848ms, application-code: 196ms)
+ GET /signup 200 in 1096ms (next.js: 983ms, application-code: 113ms)
+ GET /demo 200 in 889ms (next.js: 800ms, application-code: 89ms)

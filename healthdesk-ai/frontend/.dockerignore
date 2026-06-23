@@ -1,0 +1,9 @@
+.next
+node_modules
+npm-debug.log
+frontend-*.log
+next-*.log
+verification-artifacts
+.env.local
+.env*.local
+Dockerfile
