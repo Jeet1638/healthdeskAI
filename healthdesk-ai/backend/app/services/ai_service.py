@@ -52,7 +52,7 @@ URGENCY_VALUES = {"low", "medium", "high", "emergency"}
 SUPPORTED_LLM_PROVIDERS = {"openai", "groq"}
 DEFAULT_MODELS = {
     "openai": "gpt-4o-mini",
-    "groq": "llama-3.1-8b-instant",
+    "groq": "openai/gpt-oss-20b",
 }
 
 
@@ -124,8 +124,17 @@ def _llm_error_message(action: str, exc: Exception) -> str:
             f"{provider} {action} failed because the API key is invalid or not allowed "
             "to use this model."
         )
+    if status_code == 404:
+        return (
+            f"{provider} {action} failed because the model '{_llm_model()}' does not exist "
+            "or is not available to this key. The provider may have decommissioned it. "
+            "Set LLM_MODEL to a currently supported model."
+        )
     if isinstance(exc, APITimeoutError):
         return f"{provider} {action} timed out. Please try again."
+    provider_detail = str(exc).strip()
+    if provider_detail:
+        return f"{provider} {action} failed: {provider_detail}"
     return f"{provider} {action} failed"
 
 

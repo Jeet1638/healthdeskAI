@@ -27,7 +27,7 @@ services:
       DATABASE_URL: postgresql://healthdesk:healthdesk@db:5432/healthdesk
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:-development_secret_change_me_min_32_chars}
       LLM_PROVIDER: groq
-      LLM_MODEL: llama-3.1-8b-instant
+      LLM_MODEL: openai/gpt-oss-20b
       FRONTEND_URL: http://localhost:3000
       ENVIRONMENT: development
     depends_on:

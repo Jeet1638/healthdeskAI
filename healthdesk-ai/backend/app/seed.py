@@ -288,10 +288,18 @@ def ensure_appointment_slots(
     clinic: Clinic,
     providers: list[Provider],
 ) -> list[AppointmentSlot]:
+    # Only count slots a patient could actually book. Counting every slot ever
+    # created meant a clinic seeded weeks ago kept its expired slots and never
+    # got new ones, so booking stayed permanently unavailable.
+    now = datetime.now(PHOENIX_TZ)
     existing_slots = list(
         session.execute(
             select(AppointmentSlot)
-            .where(AppointmentSlot.clinic_id == clinic.id)
+            .where(
+                AppointmentSlot.clinic_id == clinic.id,
+                AppointmentSlot.start_time >= now,
+                AppointmentSlot.is_booked.is_(False),
+            )
             .order_by(AppointmentSlot.start_time)
         )
         .scalars()
@@ -300,7 +308,7 @@ def ensure_appointment_slots(
     if len(existing_slots) >= 20:
         return existing_slots[:20]
 
-    start_date = datetime.now(PHOENIX_TZ).date() + timedelta(days=1)
+    start_date = now.date() + timedelta(days=1)
     day_offset = 0
     hours_by_count = {2: [9, 11], 3: [9, 11, 14]}
 

@@ -394,18 +394,44 @@ def _format_slot(slot: AppointmentSlot, clinic: Clinic) -> str:
     return formatted.replace(" 0", " ")
 
 
-BOOKING_KEYWORDS = {
-    "appointment",
-    "book",
-    "schedule",
-    "slot",
-    "visit",
-    "checkup",
-    "check-up",
-    "follow-up",
-    "follow up",
-    "consultation",
-}
+# Words that merely name the booking topic. On their own they do not mean the
+# patient wants to schedule: "where do I park when I visit?" is an FAQ.
+BOOKING_TOPIC_RE = re.compile(
+    r"\b(?:appointments?|slots?|visits?|checkups?|check-ups?"
+    r"|follow[\s-]?ups?|consultations?|physicals?)\b",
+    re.IGNORECASE,
+)
+
+# Phrases that signal a scheduling request on their own.
+BOOKING_ACTION_RE = re.compile(
+    r"\b(?:book|booking|schedule|scheduling|reschedule|rebook"
+    r"|availabilit(?:y|ies)|openings?|slots?)\b"
+    r"|\b(?:come\s+in|be\s+seen|get\s+in|fit\s+me\s+in"
+    r"|squeeze\s+me\s+in|sign\s+me\s+up)\b",
+    re.IGNORECASE,
+)
+
+# Softer scheduling verbs, which only count when they sit directly beside a
+# booking topic, so "do I need a referral for a consultation?" stays an FAQ.
+BOOKING_VERB_TOPIC_RE = re.compile(
+    r"\b(?:make|set\s?up|arrange|reserve|need|want|get|take|find)\s+"
+    r"(?:an?|the|my|another|new|next)?\s*"
+    r"(?:new|first|another|next|early|late|morning|afternoon)?\s*"
+    r"(?:appointments?|slots?|visits?|checkups?|check-ups?"
+    r"|follow[\s-]?ups?|consultations?|physicals?)\b",
+    re.IGNORECASE,
+)
+
+# "next available appointment", "what times are available" and similar, in
+# either word order, without matching "are lab results available online?".
+BOOKING_AVAILABILITY_RE = re.compile(
+    r"\b(?:available|free|open|earliest|soonest|next)\b[^.?!]{0,30}?"
+    r"\b(?:appointments?|slots?|visits?|checkups?|consultations?"
+    r"|times?|dates?|openings?)\b"
+    r"|\b(?:appointments?|slots?|visits?|checkups?|consultations?|times?|dates?)\b"
+    r"[^.?!]{0,30}?\b(?:available|availability|open|free)\b",
+    re.IGNORECASE,
+)
 UUID_RE = re.compile(
     r"\b[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b",
     re.IGNORECASE,
@@ -1030,15 +1056,44 @@ def _selected_slot_id_from_text(text: str) -> UUID | None:
     return UUID(matches[-1])
 
 
+def _looks_like_booking_request(text: str) -> bool:
+    return bool(
+        BOOKING_ACTION_RE.search(text)
+        or BOOKING_VERB_TOPIC_RE.search(text)
+        or BOOKING_AVAILABILITY_RE.search(text)
+        or _requests_broad_availability(text)
+    )
+
+
+def _is_booking_continuation(
+    conversation: Conversation, latest_message: str, messages: list[Message]
+) -> bool:
+    """True when the live thread is a booking and this message answers it.
+
+    The booking flow asks for a slot, name, email, phone and visit type, so those
+    replies must stay in the flow even though they carry no scheduling verb.
+    _save_assistant_message rewrites the category on every other kind of turn, so
+    this only holds while booking is genuinely the open question.
+    """
+    if conversation.category != "book_appointment":
+        return False
+    if _selected_slot_id_from_messages(messages):
+        return True
+    return bool(
+        EMAIL_RE.search(latest_message)
+        or PHONE_RE.search(latest_message)
+        or BOOKING_TOPIC_RE.search(latest_message)
+    )
+
+
 def _is_booking_related(conversation: Conversation, latest_message: str, messages: list[Message]) -> bool:
     if conversation.status == "closed":
-        return any(keyword in latest_message.lower() for keyword in BOOKING_KEYWORDS)
+        return _looks_like_booking_request(latest_message)
     if UUID_RE.search(latest_message):
         return True
-    if conversation.category == "book_appointment" and _selected_slot_id_from_messages(messages):
+    if _is_booking_continuation(conversation, latest_message, messages):
         return True
-    latest = latest_message.lower()
-    return any(keyword in latest for keyword in BOOKING_KEYWORDS)
+    return _looks_like_booking_request(latest_message)
 
 
 def _is_courtesy_message(message: str) -> bool:
